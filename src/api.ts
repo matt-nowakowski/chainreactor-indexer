@@ -1,5 +1,6 @@
 import express from "express";
-import { graphqlHTTP } from "express-graphql";
+import { createHandler } from "graphql-http/lib/use/express";
+import { graphql } from "graphql";
 import {
   queryAccountExtrinsics,
   queryAccountTransfers,
@@ -17,14 +18,49 @@ const app = express();
 
 // ─── GraphQL ─────────────────────────────────────────────────────
 
-app.use(
-  "/graphql",
-  graphqlHTTP({
-    schema,
-    rootValue,
-    graphiql: true,
-  })
-);
+app.all("/graphql", createHandler({ schema, rootValue }));
+
+// Serve GraphiQL playground
+app.get("/graphiql", (_req, res) => {
+  res.setHeader("Content-Type", "text/html");
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Indexer GraphiQL</title>
+  <style>body{height:100vh;margin:0;overflow:hidden}</style>
+  <link rel="stylesheet" href="https://unpkg.com/graphiql@3/graphiql.min.css" />
+</head>
+<body>
+  <div id="graphiql" style="height:100vh"></div>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/graphiql@3/graphiql.min.js"></script>
+  <script>
+    const fetcher = GraphiQL.createFetcher({ url: '/graphql' });
+    ReactDOM.createRoot(document.getElementById('graphiql')).render(
+      React.createElement(GraphiQL, {
+        fetcher,
+        defaultQuery: \`{
+  status {
+    syncing
+    lastIndexedBlock
+    chainHead
+    totalBlocks
+    totalExtrinsics
+    totalEvents
+    totalTransfers
+  }
+  blocks(limit: 5) {
+    blocks { number hash author extrinsic_count event_count timestamp }
+    total
+  }
+}\`
+      })
+    );
+  </script>
+</body>
+</html>`);
+});
 
 function paginate(query: { limit?: string; offset?: string; page?: string }) {
   const limit = Math.min(Number(query.limit) || 25, 100);
