@@ -228,6 +228,11 @@ export async function queryTransfers(limit: number, offset: number) {
   return { rows: res.rows, total: Number(countRes.rows[0].count) };
 }
 
+export async function queryBlock(number: number) {
+  const res = await pool.query("SELECT * FROM blocks WHERE number = $1", [number]);
+  return res.rows.length > 0 ? res.rows[0] : null;
+}
+
 export async function queryBlocks(limit: number, offset: number) {
   const res = await pool.query(
     `SELECT * FROM blocks ORDER BY number DESC LIMIT $1 OFFSET $2`,

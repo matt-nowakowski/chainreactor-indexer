@@ -1,4 +1,5 @@
 import express from "express";
+import { graphqlHTTP } from "express-graphql";
 import {
   queryAccountExtrinsics,
   queryAccountTransfers,
@@ -10,8 +11,20 @@ import {
   getIndexerStats,
 } from "./db";
 import { getStatus } from "./indexer";
+import { schema, rootValue } from "./graphql";
 
 const app = express();
+
+// ─── GraphQL ─────────────────────────────────────────────────────
+
+app.use(
+  "/graphql",
+  graphqlHTTP({
+    schema,
+    rootValue,
+    graphiql: true,
+  })
+);
 
 function paginate(query: { limit?: string; offset?: string; page?: string }) {
   const limit = Math.min(Number(query.limit) || 25, 100);
