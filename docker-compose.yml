@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: indexer
+      POSTGRES_PASSWORD: indexer
+      POSTGRES_DB: indexer
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U indexer"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  indexer:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://indexer:indexer@postgres:5432/indexer
+      WS_URL: ${WS_URL:-ws://host.docker.internal:9944}
+      BATCH_SIZE: ${BATCH_SIZE:-50}
+      PORT: "4000"
+    ports:
+      - "${INDEXER_PORT:-4000}:4000"
+
+volumes:
+  pgdata:
