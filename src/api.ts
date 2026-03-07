@@ -21,12 +21,15 @@ const app = express();
 app.all("/graphql", createHandler({ schema, rootValue }));
 
 // Serve GraphiQL playground
+const CHAIN_NAME = process.env.CHAIN_NAME || "Chain";
+
 app.get("/graphiql", (_req, res) => {
   res.setHeader("Content-Type", "text/html");
   res.send(`<!DOCTYPE html>
 <html>
 <head>
-  <title>Indexer GraphiQL</title>
+  <title>${CHAIN_NAME} — GraphQL Explorer</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%233b82f6"/><path d="M8 16l4-6h8l4 6-4 6h-8z" fill="white" opacity="0.9"/><circle cx="16" cy="16" r="3" fill="%233b82f6"/></svg>')}" />
   <style>body{height:100vh;margin:0;overflow:hidden}</style>
   <link rel="stylesheet" href="https://unpkg.com/graphiql@3/graphiql.min.css" />
 </head>
@@ -40,7 +43,8 @@ app.get("/graphiql", (_req, res) => {
     ReactDOM.createRoot(document.getElementById('graphiql')).render(
       React.createElement(GraphiQL, {
         fetcher,
-        defaultQuery: \`{
+        defaultQuery: \`# ${CHAIN_NAME} — Chain Indexer GraphQL API
+{
   status {
     syncing
     lastIndexedBlock
