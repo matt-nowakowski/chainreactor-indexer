@@ -28,7 +28,7 @@ app.get("/graphiql", (_req, res) => {
 <html>
 <head>
   <title>${chainName} — GraphQL Explorer</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="%232563EB"/></svg>')}" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#2563EB"/></svg>')}" />
   <style>body{height:100vh;margin:0;overflow:hidden}</style>
   <link rel="stylesheet" href="https://unpkg.com/graphiql@3/graphiql.min.css" />
 </head>
