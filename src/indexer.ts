@@ -15,6 +15,7 @@ let api: ApiPromise;
 let chainHead = 0;
 let isSyncing = false;
 let lastIndexedBlock = -1;
+let rpcChainName = "";
 
 export function getStatus() {
   return {
@@ -23,7 +24,12 @@ export function getStatus() {
     chainHead,
     behind: chainHead - lastIndexedBlock,
     wsUrl: WS_URL,
+    chainName: rpcChainName,
   };
+}
+
+export function getChainName() {
+  return process.env.CHAIN_NAME || rpcChainName || "Chain";
 }
 
 export async function startIndexer() {
@@ -31,8 +37,8 @@ export async function startIndexer() {
   const provider = new WsProvider(WS_URL);
   api = await ApiPromise.create({ provider });
 
-  const chain = await api.rpc.system.chain();
-  console.log(`[indexer] connected to ${chain.toString()}`);
+  rpcChainName = (await api.rpc.system.chain()).toString();
+  console.log(`[indexer] connected to ${rpcChainName}`);
 
   // Initial sync
   await catchUp();
