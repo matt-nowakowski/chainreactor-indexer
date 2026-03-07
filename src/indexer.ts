@@ -96,19 +96,27 @@ async function indexBlockRange(from: number, to: number) {
   // Fetch all blocks in parallel
   const blockPromises = [];
   for (let num = from; num <= to; num++) {
-    blockPromises.push(processBlock(num));
+    blockPromises.push(
+      processBlock(num).catch((err) => {
+        console.warn(`[indexer] skipping block ${num}: ${err.message?.slice(0, 80)}`);
+        return null;
+      })
+    );
   }
 
   const results = await Promise.all(blockPromises);
 
   for (const result of results) {
+    if (!result) continue;
     blocks.push(result.block);
     extrinsics.push(...result.extrinsics);
     events.push(...result.events);
     transfers.push(...result.transfers);
   }
 
-  await insertBatch(blocks, extrinsics, events, transfers);
+  if (blocks.length > 0) {
+    await insertBatch(blocks, extrinsics, events, transfers);
+  }
 }
 
 async function processBlock(blockNumber: number): Promise<{
@@ -118,10 +126,16 @@ async function processBlock(blockNumber: number): Promise<{
   transfers: TransferRow[];
 }> {
   const hash = await api.rpc.chain.getBlockHash(blockNumber);
-  const [signedBlock, allEvents] = await Promise.all([
-    api.rpc.chain.getBlock(hash),
-    api.query.system.events.at(hash),
-  ]);
+  const signedBlock = await api.rpc.chain.getBlock(hash);
+
+  // Try to get events from state — fails for pruned blocks
+  let allEvents: unknown;
+  try {
+    allEvents = await api.query.system.events.at(hash);
+  } catch {
+    // State pruned — we can still index the block and extrinsics, just no events/transfers
+    allEvents = [];
+  }
 
   const block = signedBlock.block;
   const header = block.header;
