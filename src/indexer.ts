@@ -6,6 +6,7 @@ import {
   ExtrinsicRow,
   EventRow,
   TransferRow,
+  RemarkRow,
 } from "./db";
 
 const BATCH_SIZE = Number(process.env.BATCH_SIZE) || 50;
@@ -98,6 +99,7 @@ async function indexBlockRange(from: number, to: number) {
   const extrinsics: ExtrinsicRow[] = [];
   const events: EventRow[] = [];
   const transfers: TransferRow[] = [];
+  const remarks: RemarkRow[] = [];
 
   // Fetch all blocks in parallel
   const blockPromises = [];
@@ -118,10 +120,11 @@ async function indexBlockRange(from: number, to: number) {
     extrinsics.push(...result.extrinsics);
     events.push(...result.events);
     transfers.push(...result.transfers);
+    remarks.push(...result.remarks);
   }
 
   if (blocks.length > 0) {
-    await insertBatch(blocks, extrinsics, events, transfers);
+    await insertBatch(blocks, extrinsics, events, transfers, remarks);
   }
 }
 
@@ -130,6 +133,7 @@ async function processBlock(blockNumber: number): Promise<{
   extrinsics: ExtrinsicRow[];
   events: EventRow[];
   transfers: TransferRow[];
+  remarks: RemarkRow[];
 }> {
   const hash = await api.rpc.chain.getBlockHash(blockNumber);
   const signedBlock = await api.rpc.chain.getBlock(hash);
@@ -193,6 +197,7 @@ async function processBlock(blockNumber: number): Promise<{
   const blockExtrinsics: ExtrinsicRow[] = [];
   const blockEvents: EventRow[] = [];
   const blockTransfers: TransferRow[] = [];
+  const blockRemarks: RemarkRow[] = [];
 
   // Process extrinsics
   block.extrinsics.forEach((ext, extIdx) => {
@@ -211,6 +216,43 @@ async function processBlock(blockNumber: number): Promise<{
       fee,
       timestamp,
     });
+
+    // Extract remarks from system.remark / system.remarkWithEvent
+    if (
+      ext.method.section === "system" &&
+      (ext.method.method === "remark" || ext.method.method === "remarkWithEvent")
+    ) {
+      const rawArg = ext.method.args[0];
+      const dataHex = rawArg ? rawArg.toHex() : "0x";
+
+      // Try to decode as UTF-8
+      let dataUtf8: string | null = null;
+      try {
+        const hex = dataHex.startsWith("0x") ? dataHex.slice(2) : dataHex;
+        if (hex.length > 0) {
+          const decoded = Buffer.from(hex, "hex").toString("utf-8");
+          // Check if it looks like printable text (at least 80% printable chars)
+          const printable = decoded.replace(/[^\x20-\x7E\n\r\t]/g, "").length;
+          if (printable / decoded.length > 0.8) {
+            dataUtf8 = decoded;
+          }
+        }
+      } catch {
+        // Not valid UTF-8
+      }
+
+      blockRemarks.push({
+        block_number: blockNumber,
+        block_hash: hash.toHex(),
+        extrinsic_hash: ext.hash.toHex(),
+        extrinsic_index: extIdx,
+        signer,
+        data_hex: dataHex,
+        data_utf8: dataUtf8,
+        content_hash: null,
+        timestamp,
+      });
+    }
   });
 
   // Process events
@@ -283,5 +325,6 @@ async function processBlock(blockNumber: number): Promise<{
     extrinsics: blockExtrinsics,
     events: blockEvents,
     transfers: blockTransfers,
+    remarks: blockRemarks,
   };
 }

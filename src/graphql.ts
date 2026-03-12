@@ -7,6 +7,8 @@ import {
   queryTransfers,
   queryAccountExtrinsics,
   queryAccountTransfers,
+  queryRemarks,
+  queryRemarkByHash,
   searchByHash,
   getIndexerStats,
 } from "./db";
@@ -85,6 +87,24 @@ export const schema = buildSchema(`
     transfers: Int
   }
 
+  type Remark {
+    id: Int!
+    block_number: Int!
+    block_hash: String!
+    extrinsic_hash: String!
+    extrinsic_index: Int!
+    signer: String
+    data_hex: String!
+    data_utf8: String
+    content_hash: String
+    timestamp: Float
+  }
+
+  type RemarksResult {
+    remarks: [Remark!]!
+    total: Int!
+  }
+
   type IndexerStatus {
     syncing: Boolean!
     lastIndexedBlock: Int!
@@ -95,6 +115,7 @@ export const schema = buildSchema(`
     totalExtrinsics: Int!
     totalEvents: Int!
     totalTransfers: Int!
+    totalRemarks: Int!
   }
 
   type Query {
@@ -103,6 +124,8 @@ export const schema = buildSchema(`
     extrinsics(limit: Int, offset: Int): ExtrinsicsResult!
     events(limit: Int, offset: Int, pallet: String, method: String): EventsResult!
     transfers(limit: Int, offset: Int): TransfersResult!
+    remarks(limit: Int, offset: Int, signer: String, fromBlock: Int, toBlock: Int, search: String): RemarksResult!
+    remark(extrinsicHash: String!): Remark
     accountExtrinsics(address: String!, limit: Int, offset: Int): ExtrinsicsResult!
     accountTransfers(address: String!, limit: Int, offset: Int): TransfersResult!
     search(query: String!): SearchResult
@@ -165,6 +188,30 @@ export const rootValue = {
     const p = clampPagination(limit, offset);
     const result = await queryTransfers(p.limit, p.offset);
     return { transfers: result.rows, total: result.total };
+  },
+
+  async remarks({
+    limit,
+    offset,
+    signer,
+    fromBlock,
+    toBlock,
+    search,
+  }: {
+    limit?: number;
+    offset?: number;
+    signer?: string;
+    fromBlock?: number;
+    toBlock?: number;
+    search?: string;
+  }) {
+    const p = clampPagination(limit, offset);
+    const result = await queryRemarks(p.limit, p.offset, signer, fromBlock, toBlock, search);
+    return { remarks: result.rows, total: result.total };
+  },
+
+  async remark({ extrinsicHash }: { extrinsicHash: string }) {
+    return queryRemarkByHash(extrinsicHash);
   },
 
   async accountExtrinsics({

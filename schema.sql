@@ -67,3 +67,22 @@ CREATE INDEX IF NOT EXISTS idx_transfers_from ON transfers(from_address);
 CREATE INDEX IF NOT EXISTS idx_transfers_to ON transfers(to_address);
 CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash);
 CREATE INDEX IF NOT EXISTS idx_blocks_author ON blocks(author) WHERE author IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS remarks (
+  id                SERIAL PRIMARY KEY,
+  block_number      BIGINT NOT NULL REFERENCES blocks(number),
+  block_hash        TEXT NOT NULL,
+  extrinsic_hash    TEXT NOT NULL,
+  extrinsic_index   INT NOT NULL,
+  signer            TEXT,
+  data_hex          TEXT NOT NULL,
+  data_utf8         TEXT,
+  content_hash      TEXT,
+  timestamp         BIGINT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_remarks_signer ON remarks(signer) WHERE signer IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_remarks_block ON remarks(block_number);
+CREATE INDEX IF NOT EXISTS idx_remarks_extrinsic_hash ON remarks(extrinsic_hash);
+CREATE INDEX IF NOT EXISTS idx_remarks_content_hash ON remarks(content_hash) WHERE content_hash IS NOT NULL;

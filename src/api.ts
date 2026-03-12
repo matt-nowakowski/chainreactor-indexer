@@ -8,6 +8,8 @@ import {
   queryEvents,
   queryTransfers,
   queryBlocks,
+  queryRemarks,
+  queryRemarkByHash,
   searchByHash,
   getIndexerStats,
 } from "./db";
@@ -150,6 +152,36 @@ app.get("/blocks", async (req, res) => {
     const { limit, offset } = paginate(req.query as Record<string, string>);
     const result = await queryBlocks(limit, offset);
     res.json({ blocks: result.rows, total: result.total, limit, offset });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── Remarks ────────────────────────────────────────────────────
+
+app.get("/remarks", async (req, res) => {
+  try {
+    const { limit, offset } = paginate(req.query as Record<string, string>);
+    const { signer, fromBlock, toBlock, search } = req.query as Record<string, string>;
+    const result = await queryRemarks(
+      limit,
+      offset,
+      signer || undefined,
+      fromBlock ? Number(fromBlock) : undefined,
+      toBlock ? Number(toBlock) : undefined,
+      search || undefined
+    );
+    res.json({ remarks: result.rows, total: result.total, limit, offset });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.get("/remarks/:hash", async (req, res) => {
+  try {
+    const remark = await queryRemarkByHash(req.params.hash);
+    if (!remark) return res.status(404).json({ error: "Not found" });
+    res.json(remark);
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }

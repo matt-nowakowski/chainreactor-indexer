@@ -79,11 +79,24 @@ export interface TransferRow {
   timestamp: number | null;
 }
 
+export interface RemarkRow {
+  block_number: number;
+  block_hash: string;
+  extrinsic_hash: string;
+  extrinsic_index: number;
+  signer: string | null;
+  data_hex: string;
+  data_utf8: string | null;
+  content_hash: string | null;
+  timestamp: number | null;
+}
+
 export async function insertBatch(
   blocks: BlockRow[],
   extrinsics: ExtrinsicRow[],
   events: EventRow[],
-  transfers: TransferRow[]
+  transfers: TransferRow[],
+  remarks: RemarkRow[] = []
 ) {
   const client = await pool.connect();
   try {
@@ -122,6 +135,15 @@ export async function insertBatch(
          VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT DO NOTHING`,
         [t.block_number, t.extrinsic_index, t.from_address, t.to_address, t.amount, t.success, t.timestamp]
+      );
+    }
+
+    for (const r of remarks) {
+      await client.query(
+        `INSERT INTO remarks (block_number, block_hash, extrinsic_hash, extrinsic_index, signer, data_hex, data_utf8, content_hash, timestamp)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         ON CONFLICT DO NOTHING`,
+        [r.block_number, r.block_hash, r.extrinsic_hash, r.extrinsic_index, r.signer, r.data_hex, r.data_utf8, r.content_hash, r.timestamp]
       );
     }
 
@@ -261,18 +283,71 @@ export async function searchByHash(hash: string) {
   return null;
 }
 
+export async function queryRemarks(
+  limit: number,
+  offset: number,
+  signer?: string,
+  fromBlock?: number,
+  toBlock?: number,
+  search?: string
+) {
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  let paramIdx = 1;
+
+  if (signer) {
+    conditions.push(`signer = $${paramIdx++}`);
+    params.push(signer);
+  }
+  if (fromBlock !== undefined) {
+    conditions.push(`block_number >= $${paramIdx++}`);
+    params.push(fromBlock);
+  }
+  if (toBlock !== undefined) {
+    conditions.push(`block_number <= $${paramIdx++}`);
+    params.push(toBlock);
+  }
+  if (search) {
+    conditions.push(`(data_utf8 ILIKE $${paramIdx} OR data_hex ILIKE $${paramIdx} OR content_hash = $${paramIdx})`);
+    params.push(`%${search}%`);
+    paramIdx++;
+  }
+
+  const where = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+
+  const res = await pool.query(
+    `SELECT * FROM remarks${where} ORDER BY block_number DESC, extrinsic_index DESC LIMIT $${paramIdx++} OFFSET $${paramIdx}`,
+    [...params, limit, offset]
+  );
+  const countRes = await pool.query(
+    `SELECT COUNT(*) FROM remarks${where}`,
+    params
+  );
+  return { rows: res.rows, total: Number(countRes.rows[0].count) };
+}
+
+export async function queryRemarkByHash(extrinsicHash: string) {
+  const res = await pool.query(
+    "SELECT * FROM remarks WHERE extrinsic_hash = $1 LIMIT 1",
+    [extrinsicHash]
+  );
+  return res.rows.length > 0 ? res.rows[0] : null;
+}
+
 export async function getIndexerStats() {
   const lastBlock = await getLastIndexedBlock();
   const blockCount = await pool.query("SELECT COUNT(*) FROM blocks");
   const extCount = await pool.query("SELECT COUNT(*) FROM extrinsics");
   const eventCount = await pool.query("SELECT COUNT(*) FROM events");
   const transferCount = await pool.query("SELECT COUNT(*) FROM transfers");
+  const remarkCount = await pool.query("SELECT COUNT(*) FROM remarks");
   return {
     lastIndexedBlock: lastBlock,
     totalBlocks: Number(blockCount.rows[0].count),
     totalExtrinsics: Number(extCount.rows[0].count),
     totalEvents: Number(eventCount.rows[0].count),
     totalTransfers: Number(transferCount.rows[0].count),
+    totalRemarks: Number(remarkCount.rows[0].count),
   };
 }
 
